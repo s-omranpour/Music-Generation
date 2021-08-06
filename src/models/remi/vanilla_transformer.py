@@ -15,7 +15,7 @@ class RemiTransformer(pl.LightningModule):
         self.loss_func = nn.CrossEntropyLoss(reduction='none')
         
         self.embedding = RemiEmbedding(config['embedding'])
-        self.transformer = VanillaTransformer(**config['transformer'])
+        self.transformer = VanillaTransformer(config['transformer'])
         self.head = RemiHead(config['head'])
         if config['tie_emb']:
             self.head.head.weight = self.embedding.emb.weight.T
