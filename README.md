@@ -17,6 +17,11 @@ Please see [main.ipynb](main.ipynb) to learn how to train a model and generate m
 
 <br/>
 
+## Generated Samples
+check out [assets](assets/) directory!
+
+<br/>
+
 ## References
 [1] [https://github.com/YatingMusic/compound-word-transformer](https://github.com/YatingMusic/compound-word-transformer)
 
