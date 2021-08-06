@@ -55,7 +55,7 @@ class VanillaTransformer(nn.Module):
             activation=config['activation']
         )
         
-        self.encoder = nn.TransformerEncoder(layer, num_layers=n_layer)
+        self.encoder = nn.TransformerEncoder(layer, num_layers=config['n_layer'])
     
     def forward(self, src, src_len=None):
         def _generate_square_subsequent_mask(sz):
@@ -72,7 +72,7 @@ class VanillaTransformer(nn.Module):
         
         h = src.permute(1,0,2)
         att_mask = _generate_square_subsequent_mask(h.shape[0]).to(src.device)
-        h = self.encoder(h, src_mask=att_mask, src_key_padding_mask=length_mask)
+        h = self.encoder(h, mask=att_mask, src_key_padding_mask=length_mask)
         return h.permute(1,0,2)
     
 

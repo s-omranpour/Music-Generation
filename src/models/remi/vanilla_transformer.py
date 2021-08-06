@@ -61,7 +61,7 @@ class RemiTransformer(pl.LightningModule):
         self.step(batch, 'val')       
 
     @torch.no_grad()
-    def generate(self, prompt=None, max_len=1000, cuda=False, top_p=1., temperature=1.):
+    def generate(self, prompt=None, max_len=1000, window=1000, cuda=False, top_p=1., temperature=1.):
         self.eval()
         self.to('cuda' if cuda else 'cpu')
         
@@ -74,7 +74,8 @@ class RemiTransformer(pl.LightningModule):
 
         for _ in tqdm(range(max_len)):
             # forward
-            input_ = torch.tensor(init).unsqueeze(0).to('cuda' if cuda else 'cpu').long()
+            s = max(len(init) - window, 0)
+            input_ = torch.tensor(init[s:]).unsqueeze(0).to('cuda' if cuda else 'cpu').long()
             logits, _ = self.forward(input_)
             
             next_tok = sampling(

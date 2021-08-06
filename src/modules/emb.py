@@ -4,7 +4,7 @@ from torch import nn
 
 class Embeddings(nn.Module):
     def __init__(self, n_token, d_model):
-        super(Embeddings, self).__init__()
+        super().__init__()
         self.lut = nn.Embedding(n_token, d_model)
         self.d_model = d_model
 
@@ -12,9 +12,9 @@ class Embeddings(nn.Module):
         return self.lut(x.long()) * math.sqrt(self.d_model)
 
 
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, dropout=0.1, max_len=20000):
-        super(PositionalEncoding, self).__init__()
+class RelativePositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=20000):
+        super().__init__()
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
@@ -25,8 +25,7 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        return self.pe[:, :x.size(1), :]
-
+        return self.pe[:, :x.shape[1], :]
 
 class CPEmbedding(nn.Module):
     def __init__(self, config):
@@ -39,8 +38,10 @@ class CPEmbedding(nn.Module):
         sum_emb_dims = sum(config['emb_sizes'].values())
         self.proj = nn.Linear(sum_emb_dims, config['d_model']) if config['d_model'] != sum_emb_dims else None
         self.pos_emb = None
-        if config['pos_emb']:
+        if config['positional_embedding'] == 'relative':
             self.pos_emb = PositionalEncoding(d_model=config['d_model'], max_len=config['max_len'])
+        elif config['positional_embedding'] == 'absolute':
+            self.pos_emb = nn.Embedding(config['max_len'], config['d_model'])
         self.dropout = nn.Dropout(p=config['dropout'])
 
     def forward(self, x):
@@ -58,12 +59,22 @@ class CPEmbedding(nn.Module):
 class RemiEmbedding(nn.Module):
     def __init__(self, config):
         super().__init__()
+        
+        assert config['positional_embedding'] in ['none', 'relative', 'absolute']
+
         self.emb = nn.Embedding(config['n_vocab'], config['d_model'])
-        if config['pos_emb']:
-            self.pos_emb = PositionalEncoding(d_model=config['d_model'], max_len=config['max_len'])
+        if config['positional_embedding'] == 'none':
+            self.pos_emb = None
+        elif config['positional_embedding'] == 'relative':
+            self.pos_emb = RelativePositionalEncoding(d_model=config['d_model'], max_len=config['max_len'])
+        elif config['positional_embedding'] == 'absolute':
+            self.pos_emb = nn.Embedding(config['max_len'], config['d_model'])
         self.dropout = nn.Dropout(p=config['dropout'])
         
     def forward(self, x):
         h = self.emb(x)
-        return self.dropout(self.pos_emb(h) + h)
+        if self.pos_emb is not None:
+            pos = torch.arange(h.shape[1]).unsqueeze(0).repeat(h.shape[0], 1).to(h.device)
+            h += self.pos_emb(pos)
+        return self.dropout(h)
 

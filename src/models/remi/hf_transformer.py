@@ -26,26 +26,31 @@ class RemiHFTransformer(pl.LightningModule):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def forward(self, x, x_len=None, y=None):
-        if x_len is None:
-            mask = None
-        else:
-            mask = torch.zeros(x.shape[0], x.shape[1]).to(x.device)
-            for i,l in enumerate(x_len):
-                mask[i, :l] = 1.
+#         if x_len is None:
+#             mask = None
+#         else:
+#             mask = torch.zeros(x.shape[0], x.shape[1]).to(x.device)
+#             for i,l in enumerate(x_len):
+#                 mask[i, :l] = 1.
 
-        res = self.transformer(input_ids=x, attention_mask=mask, labels=y)
-#         loss = None if y is None else self.compute_loss(logits,  y, x_len)
-        return res.logits, res.loss
+        res = self.transformer(
+            input_ids=x, 
+#             attention_mask=mask, 
+#             labels=y
+        )
+        logits = res.prediction_scores
+        loss = None if y is None else self.compute_loss(logits,  y, x_len)
+        return logits, loss
 
-#     def compute_loss(self, predict, target, lengths):
-#         loss_mask = torch.zeros_like(target).to(target.device)
-#         for i, l in enumerate(lengths):
-#             loss_mask[i, :l] = 1.
+    def compute_loss(self, predict, target, lengths):
+        loss_mask = torch.zeros_like(target).to(target.device)
+        for i, l in enumerate(lengths):
+            loss_mask[i, :l] = 1.
 
-#         loss = self.loss_func(predict.transpose(1,2), target.long())
-#         loss = loss * loss_mask
-#         loss = torch.sum(loss) / torch.sum(loss_mask)
-#         return loss
+        loss = self.loss_func(predict.transpose(1,2), target.long())
+        loss = loss * loss_mask
+        loss = torch.sum(loss) / torch.sum(loss_mask)
+        return loss
 
     def step(self, batch, mode='train'):
         logits, loss  = self.forward(batch['X'], batch['X_len'], batch['labels'])
@@ -59,7 +64,7 @@ class RemiHFTransformer(pl.LightningModule):
         self.step(batch, 'val')       
 
     @torch.no_grad()
-    def generate(self, prompt=None, max_len=1000, cuda=False, top_p=1., temperature=1., n_beam=1, top_k=0):
+    def generate(self, prompt=None, max_len=1000, min_len=1000, cuda=False, top_p=1., temperature=1., n_beam=1, top_k=0):
         self.eval()
         self.to('cuda' if cuda else 'cpu')
         
@@ -70,12 +75,13 @@ class RemiHFTransformer(pl.LightningModule):
             const = prompt.const
             init = prompt.to_remi(ret='index')
 
-        return model.generate(
-            torch.tensor(init).unsqueeze(0), 
+        return self.transformer.generate(
+            torch.tensor(init).unsqueeze(0).to('cuda' if cuda else 'cpu'), 
             do_sample=True, 
             num_beams=n_beam, 
             temperature=temperature, 
             top_p=top_p, 
             top_k=top_k, 
-            max_length=max_len
-        )
+            max_length=max_len,
+            min_length=min_len,
+        )[0].cpu().numpy()

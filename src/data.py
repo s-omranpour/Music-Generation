@@ -30,6 +30,7 @@ class MidiDataset(Dataset):
         const : Constants = None, 
         instruments : List[str] = ['piano'],
         mode : str = 'remi',
+        pad_value : int = 0,
         max_files : int = 100, 
         window_len : int = 10,
         n_jobs : int = 2):
@@ -40,6 +41,7 @@ class MidiDataset(Dataset):
         self.const = Constants() if const is None else const
         self.window_len = window_len
         self.mode = mode
+        self.pad_value = pad_value
 
         ## loading midis
         files = sorted(
@@ -76,8 +78,8 @@ class MidiDataset(Dataset):
     def fn(self, batch):
         def pad(x, l):
             if self.mode == 'cp':
-                return np.pad(x, ((0, l), (0, 0)))
-            return np.pad(x, (0, l))
+                return np.pad(x, ((0, l), (0, 0)), constant_values=self.pad_value)
+            return np.pad(x, (0, l), constant_values=self.pad_value)
         
         x_len = torch.tensor([len(x)-1 for x in batch])
         M = max(x_len)

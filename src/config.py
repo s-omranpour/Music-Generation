@@ -17,6 +17,7 @@ def make_config(
     mode : str = 'cp',
     model : str = 'transformer',
     d_model : int = 512, 
+    max_len : int = 1000,
     dropout : float = 0.1, 
     lr : float = 1e-4,
     tie_emb : bool = False,
@@ -38,8 +39,8 @@ def make_config(
         'embedding': {
             'd_model' : d_model, 
             'dropout' : dropout,
-            'max_len' : 10000,
-            'pos_emb' : pos_emb
+            'max_len' : max_len,
+            'positional_embedding' : pos_emb
         },
         'head' : {
             'd_model' : d_model
