@@ -12,7 +12,7 @@ This is a toolkit for symbolic music generation in pyTorch. You can generate tra
 
 <br/>
 
-## Examples
+## Usage
 Please see [main.ipynb](main.ipynb) to learn how to train a model and generate music!
 
 <br/>
