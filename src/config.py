@@ -1,12 +1,13 @@
 from typing import List, Dict
 from deepnote import Constants
 
-ATTRIBUTES = ['ttype' , 'barbeat', 'tempo', 'chord', 'pitch', 'duration', 'velocity']
+ATTRIBUTES = ['ttype' , 'barbeat', 'tempo', 'chord', 'inst_family', 'pitch', 'duration', 'velocity']
 EMB_SIZES = {
     'ttype' : 8, 
     'barbeat' : 32,
     'tempo' : 32,
     'chord' : 128,
+    'inst_family' : 32,
     'pitch' : 128,
     'duration' : 32,
     'velocity' : 32
@@ -73,6 +74,7 @@ def make_config(
             'barbeat' : const.n_bar_steps,
             'tempo' : const.num_tempo_bins + 1,
             'chord' : len(const.chords) + 1,
+            'inst_family' : len(const.instruments),
             'pitch' : 128,
             'duration' : const.n_bar_steps,
             'velocity' : const.num_velocity_bins

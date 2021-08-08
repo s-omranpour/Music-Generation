@@ -73,7 +73,6 @@ class RemiTransformer(pl.LightningModule):
             init = prompt.to_remi(ret='index')
 
         for _ in tqdm(range(max_len)):
-            # forward
             s = max(len(init) - window, 0)
             input_ = torch.tensor(init[s:]).unsqueeze(0).to('cuda' if cuda else 'cpu').long()
             logits, _ = self.forward(input_)

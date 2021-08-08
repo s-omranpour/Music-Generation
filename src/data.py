@@ -52,11 +52,12 @@ class MidiDataset(Dataset):
             reverse=True
         )
         
-#         tracks = Parallel(n_jobs=n_jobs)(
-#             delayed(get_track)(data_dir + file, const, window_len, instrument) for file in tqdm(files)
-#         )
+        # tracks = [get_track(data_dir + file, const, window_len, instruments, mode) for file in tqdm(files)]
+        tracks = Parallel(n_jobs=n_jobs)(
+            delayed(get_track)(data_dir + file, const, window_len, instruments, mode) for file in tqdm(files)
+        )
+        
 
-        tracks = [get_track(data_dir + file, const, window_len, instruments, mode) for file in tqdm(files)]
         self.tracks = list(filter(lambda x: x is not None, tracks))
         lens = list(map(len, self.tracks))
         self.lens = [max(0, l - self.window_len) + 1 for l in lens]

@@ -39,7 +39,7 @@ class CPEmbedding(nn.Module):
         self.proj = nn.Linear(sum_emb_dims, config['d_model']) if config['d_model'] != sum_emb_dims else None
         self.pos_emb = None
         if config['positional_embedding'] == 'relative':
-            self.pos_emb = PositionalEncoding(d_model=config['d_model'], max_len=config['max_len'])
+            self.pos_emb = RelativePositionalEncoding(d_model=config['d_model'], max_len=config['max_len'])
         elif config['positional_embedding'] == 'absolute':
             self.pos_emb = nn.Embedding(config['max_len'], config['d_model'])
         self.dropout = nn.Dropout(p=config['dropout'])
@@ -52,7 +52,8 @@ class CPEmbedding(nn.Module):
         if self.proj is not None:
             embs = self.proj(embs)
         if self.pos_emb is not None:
-            embs += self.pos_emb(embs)
+            pos = torch.arange(x.shape[1]).unsqueeze(0).repeat(x.shape[0], 1).to(x.device)
+            embs += self.pos_emb(pos)
         return self.dropout(embs)
     
     

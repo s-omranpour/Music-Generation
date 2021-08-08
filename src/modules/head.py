@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 class CPHead(nn.Module):
     def __init__(self, config):
@@ -19,9 +20,9 @@ class CPHead(nn.Module):
 
     def forward(self, h, y_type=None):
         if y_type is None:
-            logit_type = self.forward_type(h)
-            n,s,t = logit_type.shape
-            y_type = torch.multinomial(logit_type.view(-1, t), 1, replacement=True).view(n, s)
+            type_prob = F.softmax(self.forward_type(h), dim=-1)
+            n,s,t = type_prob.shape
+            y_type = torch.multinomial(type_prob.view(-1, t), 1, replacement=True).view(n, s)
         tf_skip_type = self.type_emb(y_type)
 
         # project other
@@ -30,6 +31,22 @@ class CPHead(nn.Module):
         logits = []
         for k in self.config['attributes'][1:]:
             logits += [self.heads[k](y_)]
+        return logits
+    
+    
+class CPSimpleHead(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        heads = []
+        for k in config['attributes']:
+            heads += [[k, nn.Linear(config['d_model'], config['n_tokens'][k])]]
+        self.heads = nn.ModuleDict(heads)
+
+    def forward(self, h):
+        logits = []
+        for k in self.config['attributes']:
+            logits += [self.heads[k](h)]
         return logits
     
 class RemiHead(nn.Module):

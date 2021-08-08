@@ -5,10 +5,10 @@ from torch import nn
 import pytorch_lightning as pl
 from deepnote import Constants, MusicRepr
 
-from src.modules import CPEmbedding, CPHead, sampling, VanillaTransformer
+from src.modules import CPEmbedding, CPSimpleHead, sampling, VanillaTransformer
 
 
-class CPTransformer(pl.LightningModule):
+class CPSimpleTransformer(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -16,9 +16,7 @@ class CPTransformer(pl.LightningModule):
         
         self.embedding = CPEmbedding(config['embedding'])
         self.transformer = VanillaTransformer(config['transformer'])
-        self.head = CPHead(config['head'])
-        self.head.register_type_embedding(self.embedding)
-        
+        self.head = CPSimpleHead(config['head'])
 
     def configure_optimizers(self):
         opt = torch.optim.Adam(self.parameters(), lr=self.config['lr'])
@@ -28,22 +26,13 @@ class CPTransformer(pl.LightningModule):
     def count_parameters(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
-    def forward_hidden(self, x, x_len=None):
+    def forward(self, x, x_len=None):
         emb = self.embedding(x.long())
         h = self.transformer(
             src=emb, 
             src_len=x_len
         )
-        return h, self.head.forward_type(h)
-    
-    def forward_output(self, h, y=None):
-        y_type = None if y is None else y[..., 0]
-        return self.head(h, y_type)
-    
-    def forward(self, x, x_len=None, y=None):
-        h, y_type = self.forward_hidden(x, x_len)
-        logits = [y_type] + self.forward_output(h, y)
-        return logits
+        return self.head(h)
 
     def compute_loss(self, predict, target, loss_mask):
         loss = self.loss_func(predict.transpose(1,2), target.long())
@@ -53,7 +42,7 @@ class CPTransformer(pl.LightningModule):
 
     def step(self, batch, mode='train'):
         x, target, lengths = batch['X'], batch['labels'], batch['X_len']
-        logits = self.forward(x, lengths, target if mode == 'train' else None)
+        logits = self.forward(x, lengths)
         
         ## mask
         loss_mask = torch.zeros_like(target).to(x.device)
@@ -77,18 +66,9 @@ class CPTransformer(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         self.step(batch, mode='val')
 
-    def sample_output(self, h, y_type, cuda=False, gen_conf=None):
-        y_type_logit = y_type[0, -1]
-        cur_word_type = sampling(
-            y_type_logit, 
-            t=1. if gen_conf is None else gen_conf['t_ttype'],
-            p=1. if gen_conf is None else gen_conf['p_ttype']
-        )
-
-        type_word_t = torch.tensor([cur_word_type]).unsqueeze(0).to('cuda' if cuda else 'cpu').long()
-        logits = self.head(h[:,-1,:].unsqueeze(1), type_word_t)
-        word = [cur_word_type]
-        for i,k in enumerate(self.config['attributes'][1:]):
+    def sample_output(self, logits, cuda=False, gen_conf=None):
+        word = []
+        for i,k in enumerate(self.config['attributes']):
             word += [
                 sampling(
                     logits[i][0, -1], 
@@ -113,10 +93,10 @@ class CPTransformer(pl.LightningModule):
         for _ in tqdm(range(max_len)):
             s = max(0, len(init) - window)
             input_ = torch.tensor(init[s:]).unsqueeze(0).to('cuda' if cuda else 'cpu').long()
-            h, y_type = self.forward_hidden(input_)
+            logits = self.forward(input_)
             
             # sample others
-            next_word = self.sample_output(h, y_type, cuda=cuda, gen_conf=gen_conf)
+            next_word = self.sample_output(logits, cuda=cuda, gen_conf=gen_conf)
             init += [next_word]
 
         return np.array(init)
