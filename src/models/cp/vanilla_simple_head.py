@@ -34,11 +34,17 @@ class CPSimpleTransformer(pl.LightningModule):
         )
         return self.head(h)
 
-    def compute_loss(self, predict, target, loss_mask):
+    def compute_loss(self, predict, target, mask):
         loss = self.loss_func(predict.transpose(1,2), target.long())
-        loss = loss * loss_mask
-        loss = torch.sum(loss) / torch.sum(loss_mask)
+        loss = loss * mask
+        loss = torch.sum(loss) / torch.sum(mask)
         return loss
+    
+    def compute_acc(self, predict, target, mask):
+        correct = torch.argmax(predict, dim=-1) == target
+        correct = correct * mask
+        return torch.sum(correct) / torch.sum(mask)
+        
 
     def step(self, batch, mode='train'):
         x, target, lengths = batch['X'], batch['labels'], batch['X_len']
@@ -56,18 +62,28 @@ class CPSimpleTransformer(pl.LightningModule):
         # loss
         total_clm_loss = 0
         total_ae_loss = 0
+        total_clm_acc = []
+        total_ae_acc = []
         for i,k in enumerate(self.config['attributes']):
             clm_loss = self.compute_loss(clm_logits[i],  target[..., i], loss_mask[..., i])
+            clm_acc = self.compute_acc(clm_logits[i],  target[..., i], loss_mask[..., i])
             ae_loss = self.compute_loss(ae_logits[i],  x[..., i], loss_mask[..., i])
+            ae_acc = self.compute_acc(ae_logits[i],  x[..., i], loss_mask[..., i])
             total_clm_loss += clm_loss
             total_ae_loss += ae_loss
+            total_clm_acc += [clm_acc]
+            total_ae_acc += [ae_acc]
             self.log(mode +'_' + k + '_clm_loss', clm_loss.item())
             self.log(mode +'_' + k + '_ae_loss', ae_loss.item())
+            self.log(mode +'_' + k + '_clm_acc', clm_acc.item())
+            self.log(mode +'_' + k + '_ae_acc', ae_acc.item())
         
         total_loss = total_clm_loss + total_ae_loss
         self.log(mode + '_clm_loss', total_clm_loss.item())
         self.log(mode + '_ae_loss', total_ae_loss.item())
         self.log(mode + '_loss', total_loss.item())
+        self.log(mode + '_clm_acc', sum(total_clm_acc).item() / len(total_clm_acc))
+        self.log(mode + '_ae_acc', sum(total_ae_acc).item() / len(total_ae_acc))
         return total_loss
 
     def training_step(self, batch, batch_idx):
@@ -80,11 +96,12 @@ class CPSimpleTransformer(pl.LightningModule):
         word = []
         for i,k in enumerate(self.config['attributes']):
             word += [
-                sampling(
-                    logits[i][0, -1], 
-                    t=1. if gen_conf is None else gen_conf['t_'+k],
-                    p=1. if gen_conf is None else gen_conf['p_'+k]
-                )
+                int(torch.argmax(logits[i][0, -1]))
+#                 sampling(
+#                     logits[i][0, -1], 
+#                     t=1. if gen_conf is None else gen_conf['t_'+k],
+#                     p=1. if gen_conf is None else gen_conf['p_'+k]
+#                 )
             ]
         return np.array(word)        
 
