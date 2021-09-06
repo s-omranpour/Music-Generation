@@ -6,7 +6,7 @@ This is a toolkit for symbolic music generation in pyTorch. You can generate tra
 
 ## Features
 - Using [pytorch_lightning](https://www.pytorchlightning.ai) as backend.
-- Using [Deepnote](https://github.com/s-omranpour/DeepNote) for encoding/decoding MIDI files.
+- Using [Deepmusic](https://github.com/s-omranpour/DeepMusic) for encoding/decoding MIDI files.
 - Supporting different transformer models + vanilla rnn. (vanilla, linear, huggingface transformers)
 - Supporting Compound Word and REMI representations. (see references)
 
